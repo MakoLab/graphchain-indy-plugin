@@ -5,6 +5,12 @@ LEDGER_IDS = {GRAPHCHAIN_LEDGER_ID, }
 
 # CLIENTS_REQUEST_FIELDS = {'xyz': Xyz}
 
-AcceptableWriteTypes = {GraphTransactions.ADD_LEI.value}
+AcceptableWriteTypes = {
+    GraphTransactions.ADD_LEI.value,
+    GraphTransactions.SIGN_LEI.value
+}
 
-AcceptableQueryTypes = {GraphTransactions.GET_LEI.value}
+AcceptableQueryTypes = {
+    GraphTransactions.GET_LEI.value,
+    GraphTransactions.GET_SIGN.value
+}
