@@ -15,18 +15,18 @@ class InterwovenHashCalculator:
 
         for s, p, o in graph:
             triple_hash = self._calculate_triple_hash(s, p, o)
-            graph_hash += self._modulo_hash(triple_hash)
+            graph_hash = self._modulo_hash(graph_hash, triple_hash)
 
             if self._is_bnode(s):
                 linked_hash = \
                     self._calculate_hash_for_triples_linked_by_subject(graph, s)
-                graph_hash += self._modulo_hash(linked_hash)
+                graph_hash = self._modulo_hash(graph_hash, linked_hash)
 
             if self._is_bnode(o):
                 linked_hash = self._calculate_hash_for_triples_linked_by_object(graph, s)
-                graph_hash += self._modulo_hash(linked_hash)
+                graph_hash = self._modulo_hash(graph_hash, linked_hash)
 
-        return "{0:x}".format(graph_hash)
+        return "{0:064x}".format(graph_hash)
 
     def _calculate_triple_hash(self, s, p, o):
         encoded_triple = self._encode_triple(s, p, o)
@@ -41,7 +41,8 @@ class InterwovenHashCalculator:
 
         linked_triples = graph.triples((None, None, resource))
         for s, p, o in linked_triples:
-            partial_hash += self._modulo_hash(
+            partial_hash = self._modulo_hash(
+                partial_hash,
                 self._calculate_triple_hash(s, p, o))
 
         return partial_hash
@@ -51,7 +52,8 @@ class InterwovenHashCalculator:
 
         linked_triples = graph.triples((resource, None, None))
         for s, p, o in linked_triples:
-            partial_hash += self._modulo_hash(
+            partial_hash = self._modulo_hash(
+                partial_hash,
                 self._calculate_triple_hash(s, p, o))
 
         return partial_hash
@@ -71,8 +73,8 @@ class InterwovenHashCalculator:
 
         return (s_encoded + p_encoded + o_encoded).encode()
 
-    def _modulo_hash(self, a_hash):
-        return a_hash % self._MOD_OPERAND
+    def _modulo_hash(self, a_number, a_hash):
+        return (a_number + a_hash) % self._MOD_OPERAND
 
     @staticmethod
     def _is_bnode(resource):
