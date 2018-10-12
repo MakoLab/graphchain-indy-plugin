@@ -1,8 +1,8 @@
 from plenum.common.constants import KeyValueStorageType
 
 
-def get_config(config):
-    config.leiTransactionsFile = 'lei_transactions'
-    config.leiStateStorage = KeyValueStorageType.Leveldb
-    config.leiStateDbName = 'lei_state'
+def update_nodes_config_with_plugin_settings(config):
+    config.graphchainTransactionsFile = 'graphchain_transactions'
+    config.graphchainStateStorage = KeyValueStorageType.Leveldb
+    config.graphchainStateDbName = 'graphchain_state'
     return config

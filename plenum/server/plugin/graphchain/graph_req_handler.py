@@ -1,24 +1,26 @@
-from plenum.common.constants import TXN_TIME, TXN_TYPE, TARGET_NYM
+from common.serializers.json_serializer import JsonSerializer
+from common.serializers.serialization import ledger_txn_serializer
+from plenum.common.constants import TXN_TIME, TXN_TYPE
 from plenum.common.exceptions import InvalidClientRequest
 from plenum.common.request import Request
+from plenum.common.txn_util import reqToTxn, append_txn_metadata
 from plenum.common.types import f
-from plenum.persistence.util import txnsWithSeqNo
-from plenum.server.req_handler import RequestHandler
+from plenum.server.ledger_req_handler import LedgerRequestHandler
 from rdflib import Graph
-from stp_core.common.log import getlogger
 
 from plenum.server.plugin.graphchain.constants import ADD_LEI, GET_LEI, \
     LEI_FIELD, GRAPH_CONTENT_FIELD, GRAPH_FORMAT_FIELD, \
-    GRAPH_HASH_FIELD
+    GRAPH_IHASH_FIELD, TXN_FIELD, DATA_FIELD, TXN_METADATA_FIELD
 from plenum.server.plugin.graphchain.graphs import FormatValidator, \
     GraphValidator
 from plenum.server.plugin.graphchain.hashes import InterwovenHashCalculator
-from plenum.server.plugin.graphchain.helpers import from_base64, req_to_txn
+from plenum.server.plugin.graphchain.helpers import from_base64
+from plenum.server.plugin.graphchain.logger import get_debug_logger
 
-logger = getlogger()
+logger = get_debug_logger()
 
 
-class GraphchainReqHandler(RequestHandler):
+class GraphchainReqHandler(LedgerRequestHandler):
     write_types = {ADD_LEI}
     query_types = {GET_LEI}
 
@@ -37,51 +39,57 @@ class GraphchainReqHandler(RequestHandler):
     def get_query_response(self, req: Request):
         return self.query_handlers[req.operation[TXN_TYPE]](req)
 
-    def handle_get_lei(self, req: Request):
+    def handle_get_lei(self, req: Request, show_debug: bool = False):
         op = req.operation
         op_type = op.get(TXN_TYPE)
         logger.info("Handling '{}' read operation...".format(op_type))
-        graph_hash = op.get(GRAPH_HASH_FIELD)
+        graph_hash = op.get(GRAPH_IHASH_FIELD)
 
-        raw_data = self.ledger.get(**{GRAPH_HASH_FIELD: graph_hash})
-        if raw_data is not None:
-            data = dict(raw_data)
-            lei_data = dict(data.get(LEI_FIELD))
-            logger.info("request:  {}".format(req))
-            logger.info("data:     {}".format(data))
+        found_data = self.ledger.get(**{GRAPH_IHASH_FIELD: graph_hash})
+        logger.debug("found_data: {}".format(found_data))
+
+        if show_debug:
+            self._print_debug_data(found_data)
+
+        if found_data is not None:
+            txn_fragment = found_data.get(TXN_FIELD)
+            data_fragment = dict(txn_fragment.get(DATA_FIELD))
+            lei_data = dict(data_fragment.get(LEI_FIELD))
+            logger.debug("request:        {}".format(req))
+            logger.debug("data_fragment:  {}".format(data_fragment))
 
             return {
-                TXN_TYPE: data.get(TXN_TYPE),
+                TXN_TYPE: txn_fragment.get(TXN_TYPE),
                 f.IDENTIFIER.nm: req.identifier,
                 f.REQ_ID.nm: req.reqId,
 
-                f.SEQ_NO.nm: data.get(f.SEQ_NO.nm),
-                TXN_TIME: data.get(TXN_TIME),
+                f.SEQ_NO.nm: found_data.get(TXN_METADATA_FIELD).get(f.SEQ_NO.nm),
+                TXN_TIME: found_data.get(TXN_METADATA_FIELD).get(TXN_TIME),
 
-                GRAPH_HASH_FIELD: data.get(GRAPH_HASH_FIELD),
+                GRAPH_IHASH_FIELD: found_data.get(GRAPH_IHASH_FIELD),
                 LEI_FIELD: {
                     GRAPH_CONTENT_FIELD: lei_data.get(GRAPH_CONTENT_FIELD),
                     GRAPH_FORMAT_FIELD: lei_data.get(GRAPH_FORMAT_FIELD)
                 },
 
-                TARGET_NYM: data.get(TARGET_NYM)
+                # TARGET_NYM: data_fragment.get(TARGET_NYM)  # Should this be returned?
             }
         else:
-            logger.info("Data for '{}' not found.".format(graph_hash))
+            logger.info("Data for '{}' not found in the ledger.".format(graph_hash))
             return {}
 
     def doStaticValidation(self, request: Request):
         identifier, req_id, op = request.identifier, request.reqId, \
                                  request.operation
         op_type = op.get(TXN_TYPE)
-        logger.info("Static validation for the '{}' operation type: "
-                    "identifier = {}, "
-                    "reqId = {}, "
-                    "operation = {}"
-                    .format(op_type, identifier, req_id, op))
+        logger.debug("Static validation for the '{}' operation type: \n"
+                     "   identifier = {},\n"
+                     "   reqId = {},\n"
+                     "   operation = {}"
+                     .format(op_type, identifier, req_id, op))
 
         if op_type == ADD_LEI:
-            logger.info("Static validation of ADD_LEI op type...")
+            logger.debug("Static validation of ADD_LEI op type...")
             lei = op.get(LEI_FIELD)
 
             if not isinstance(lei, dict):
@@ -92,7 +100,7 @@ class GraphchainReqHandler(RequestHandler):
             self._validate_add_lei_request(identifier, req_id, lei)
 
         elif op_type == GET_LEI:
-            logger.info("Static validation of GET_LEI op type: nothing for now")
+            logger.debug("Static validation of GET_LEI op type: nothing for now")
 
         logger.info("Static validation finished without errors.")
 
@@ -100,13 +108,10 @@ class GraphchainReqHandler(RequestHandler):
         op = request.operation
         op_type = op.get(TXN_TYPE)
         # lei = op.get(LEI_FIELD)
-        logger.info("Validation request '{}': operation = {}"
-                    .format(op_type, op))
-        logger.info("There is not any dynamic validation for '{}' op."
-                    .format(op_type))
+        logger.debug("Validation request '{}': operation = {}".format(op_type, op))
 
         if op_type == ADD_LEI:
-            pass
+            logger.debug("There is not any dynamic validation for '{}' op.".format(op_type))
             # We don't need to do anything here for now, but in the future
             # we may want to validate whether the client from whom this request
             # came (LOU) is permissioned to handle this specific LEI.
@@ -119,14 +124,14 @@ class GraphchainReqHandler(RequestHandler):
         if op_type == ADD_LEI:
             lei = op.get(LEI_FIELD)
             ihash = self._calculate_hash(lei)
-            logger.info("Calculated hash: {}".format(ihash))
+            logger.debug("Calculated hash: {}".format(ihash))
 
-            txn = req_to_txn(req, cons_time)
-            txn = self._transform_txn_for_ledger(txn, ihash)
-            logger.info("txn after transformation: {}".format(txn))
-            (start, end), _ = self.ledger.appendTxns([txn])
+            txn = self._req_to_txn(req)
+            txn = append_txn_metadata(txn, txn_id=self._gen_txn_path(txn))
 
-            self.updateState(txnsWithSeqNo(start, end, [txn]))
+            self.ledger.append_txns_metadata([txn], cons_time)
+            (start, end), _ = self.ledger.appendTxns([self._transform_txn_for_ledger(txn, ihash)])
+            self.updateState([txn])
 
             self.update_graph_store(lei, ihash)
 
@@ -136,13 +141,15 @@ class GraphchainReqHandler(RequestHandler):
             logger.info("Not supported op type: '{}'.".format(op_type))
 
     def updateState(self, txns, isCommitted=False):
+        logger.debug("Updating state for a new txns:")
         for txn in txns:
+            logger.debug("  {}".format(txn))
             self._updateStateWithSingleTxn(txn, isCommitted=isCommitted)
 
     def update_graph_store(self, lei, graph_hash):
         raw_graph = from_base64(lei.get(GRAPH_CONTENT_FIELD))
         graph_format = lei.get(GRAPH_FORMAT_FIELD)
-        self._graph_store.add_lei(raw_graph, graph_format, graph_hash)
+        self._graph_store.add_graph(raw_graph, graph_format, graph_hash)
 
     def _updateStateWithSingleTxn(self, txn, isCommitted=False):
         # MAYBE: Something to do here?
@@ -175,14 +182,23 @@ class GraphchainReqHandler(RequestHandler):
         g.parse(data=from_base64(graph), format=graph_format)
         return self._hash_calculator.calculate_hash(g)
 
+    def _gen_txn_path(self, txn):
+        return None
+
+    def _req_to_txn(self, req):
+        return reqToTxn(req)
+
     @staticmethod
     def _transform_txn_for_ledger(txn, graph_hash):
-        logger.info("Transforming TXN for type '{}'.".format(txn.get(ADD_LEI)))
+        logger.debug("Adding graph hash to the transaction: {}".format(txn))
         # MAYBE: Remove GRAPH_CONTENT?
-        txn[GRAPH_HASH_FIELD] = graph_hash
+        txn[GRAPH_IHASH_FIELD] = graph_hash
         return txn
 
     @staticmethod
-    def _transform_txn_for_ledger_sign_lei(txn, ihash):
-        # txn[GRAPH_HASH_FIELD]
-        return txn
+    def _print_debug_data(found_data):
+        serializer = JsonSerializer()
+
+        txn = ledger_txn_serializer.deserialize(found_data)
+        txn = serializer.serialize(txn, toBytes=False)
+        logger.debug("txn: {}".format(txn))

@@ -5,8 +5,15 @@ GRAPHCHAIN_LEDGER_ID = 785
 ADD_LEI = GraphTransactions.ADD_LEI.value
 GET_LEI = GraphTransactions.GET_LEI.value
 
+GRAPHCHAIN_HASH_STORE_NAME = 'graphchain'
 
-LEI_FIELD = "lei"
 GRAPH_CONTENT_FIELD = "content"
 GRAPH_FORMAT_FIELD = "format"
-GRAPH_HASH_FIELD = "ihash"
+GRAPH_IHASH_FIELD = "ihash"
+LEI_FIELD = "lei"
+DATA_FIELD = "data"
+TXN_FIELD = "txn"
+TXN_METADATA_FIELD = "txnMetadata"
+
+STARDOG = 'stardog'
+NEPTUNE = 'neptune'

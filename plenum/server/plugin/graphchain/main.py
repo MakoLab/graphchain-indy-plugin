@@ -1,35 +1,53 @@
-from stp_core.common.log import getlogger
+from plenum.common.constants import DOMAIN_LEDGER_ID
 
 from plenum.server.plugin.graphchain import GRAPHCHAIN_LEDGER_ID
 from plenum.server.plugin.graphchain.client_authnr import GraphchainAuthNr
-from plenum.server.plugin.graphchain.config import get_config
+from plenum.server.plugin.graphchain.config import \
+    update_nodes_config_with_plugin_settings
+from plenum.server.plugin.graphchain.constants import STARDOG, NEPTUNE
+from plenum.server.plugin.graphchain.exceptions import \
+    NoDatabaseWithinTripleStore, TripleStoreTypeNotSupported
 from plenum.server.plugin.graphchain.graph_req_handler import \
     GraphchainReqHandler
-from plenum.server.plugin.graphchain.exceptions import \
-    UnableToInitializeGraphStore
-from plenum.server.plugin.graphchain.graph_store import GraphStore
-from plenum.server.plugin.graphchain.storage import get_lei_hash_store, \
-    get_lei_ledger, get_lei_state
-from plenum.common.constants import DOMAIN_LEDGER_ID
+from plenum.server.plugin.graphchain.graph_store import GraphStoreType
+from plenum.server.plugin.graphchain.logger import get_debug_logger
+from plenum.server.plugin.graphchain.stardog_graph_store import StardogGraphStore
+from plenum.server.plugin.graphchain.storage import get_graphchain_hash_store, \
+    get_graphchain_ledger, get_graphchain_state
 
-logger = getlogger()
+logger = get_debug_logger()
 
 
 def integrate_plugin_in_node(node):
-    node_name = node.name
-    start_msg = "Integrating the GraphChain plugin into the '{}' node.".format(
-        node_name)
+    start_msg = "Integrating the GraphChain plugin into the '{}' node.".format(node.name)
     logger.info(start_msg)
 
     _print_node_debug_info(node)
 
-    node.config = get_config(node.config)
+    node.config = update_nodes_config_with_plugin_settings(node.config)
 
-    hash_store = get_lei_hash_store(node.dataLocation)
-    ledger = get_lei_ledger(node.dataLocation,
-                            node.config.leiTransactionsFile,
-                            hash_store,
-                            node.config)
+    hash_store = get_graphchain_hash_store(node.dataLocation)
+    ledger = _prepare_and_register_ledger(node, hash_store)
+
+    _prepare_graph_store(node)
+
+    state = _prepare_and_register_state(node)
+
+    _prepare_authnr(node)
+
+    _prepare_and_register_request_handler(node, ledger, state)
+
+    return node
+
+
+def _print_node_debug_info(node):
+    logger.debug("{}".format(node.collectNodeInfo()))
+
+
+def _prepare_and_register_ledger(node, hash_store):
+    logger.debug("Creating a new ledger with ID '{}'...".format(GRAPHCHAIN_LEDGER_ID))
+
+    ledger = get_graphchain_ledger(node.dataLocation, node.config.graphchainTransactionsFile, hash_store, node.config)
     if GRAPHCHAIN_LEDGER_ID not in node.ledger_ids:
         node.ledger_ids.append(GRAPHCHAIN_LEDGER_ID)
     node.ledgerManager.addLedger(GRAPHCHAIN_LEDGER_ID,
@@ -37,38 +55,58 @@ def integrate_plugin_in_node(node):
                                  postTxnAddedToLedgerClbk=node.postTxnFromCatchupAddedToLedger)
     node.on_new_ledger_added(GRAPHCHAIN_LEDGER_ID)
 
-    # Create a GraphStore and check connection to a TS
-    logger.info("Initializing TS database for node '{}'...".format(node_name))
-    node.graph_store = GraphStore(node_name)
-    if node.graph_store.check_whether_db_exists():
-        logger.info("Database within TS exists.")
+    return ledger
+
+
+def _prepare_graph_store(node):
+    logger.info("Initializing TS database...")
+
+    ts_type = _obtain_ts_type(node.config.ts_type)
+    ts_url = node.config.ts_url
+    ts_user = node.config.ts_user
+    ts_pass = node.config.ts_pass
+    ts_db_name = node.name + node.config.ts_db_name_suffix
+
+    if ts_type == GraphStoreType.STARDOG:
+        node.graph_store = StardogGraphStore(ts_db_name, ts_url, ts_user, ts_pass)
+    elif ts_type == GraphStoreType.NEPTUNE:
+        raise NotImplementedError("Neptune TS is not implemented yet.")
     else:
-        logger.info("Database within TS does not exists. Creating...")
-        db_creation_result, reasons = node.graph_store.create_db()
-        if db_creation_result:
-            logger.info("Database created successfully."
-                        .format(node_name))
-        else:
-            msg = "Unable to initialize graph store for " \
-                  "node '{}'. Reasons: {}".format(node_name, reasons)
-            raise UnableToInitializeGraphStore(msg)
+        msg = "'{}' triple store type is not supported.".format(ts_type)
+        raise TripleStoreTypeNotSupported(msg)
 
-    # Registering state
-    state = get_lei_state(node.dataLocation,
-                          node.config.leiStateDbName,
-                          node.config)
+    if node.graph_store.check_whether_db_exists():
+        logger.info("Database '{}' within TS exists.".format(ts_db_name))
+    else:
+        msg = "There is not a database '{}' in the triple store with URL '{}'.".format(ts_db_name, ts_url)
+        raise NoDatabaseWithinTripleStore(msg)
+
+
+def _obtain_ts_type(ts_type: str):
+    if ts_type == STARDOG:
+        return GraphStoreType.STARDOG
+    elif ts_type == NEPTUNE:
+        return GraphStoreType.NEPTUNE
+    else:
+        msg = "Triple store type '{}' is not supported.".format(ts_type)
+        raise TripleStoreTypeNotSupported(msg)
+
+
+def _prepare_and_register_state(node):
+    state = get_graphchain_state(node.dataLocation,
+                                 node.config.graphchainStateDbName,
+                                 node.config)
     node.register_state(GRAPHCHAIN_LEDGER_ID, state)
-
-    # Creating authentication mechanism for LEI requests
-    lei_authnr = GraphchainAuthNr(node.states[DOMAIN_LEDGER_ID])
-    node.clientAuthNr.register_authenticator(lei_authnr)
-
-    # Creating request handler for LEI requests
-    lei_req_handler = GraphchainReqHandler(ledger, state, node.graph_store)
-    node.register_req_handler(GRAPHCHAIN_LEDGER_ID, lei_req_handler)
-
-    return node
+    return state
 
 
-def _print_node_debug_info(node):
-    pass
+def _prepare_authnr(node):
+    graphchain_authnr = GraphchainAuthNr(node.states[DOMAIN_LEDGER_ID])
+    node.clientAuthNr.register_authenticator(graphchain_authnr)
+
+
+def _prepare_and_register_request_handler(node, ledger, state):
+    logger.debug("Preparing request handler...")
+    graphchain_req_handler = GraphchainReqHandler(ledger, state, node.graph_store)
+    logger.debug("Registering request handler with ID equal to '{}'...".format(GRAPHCHAIN_LEDGER_ID))
+    node.register_req_handler(graphchain_req_handler, GRAPHCHAIN_LEDGER_ID)
