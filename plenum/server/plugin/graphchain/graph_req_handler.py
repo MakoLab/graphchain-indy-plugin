@@ -43,6 +43,7 @@ class GraphchainReqHandler(LedgerRequestHandler):
         op = req.operation
         op_type = op.get(TXN_TYPE)
         logger.info("Handling '{}' read operation...".format(op_type))
+        logger.debug("Request's details: {}".format(req))
         graph_hash = op.get(GRAPH_IHASH_FIELD)
 
         found_data = self.ledger.get(**{GRAPH_IHASH_FIELD: graph_hash})
@@ -76,7 +77,11 @@ class GraphchainReqHandler(LedgerRequestHandler):
             }
         else:
             logger.info("Data for '{}' not found in the ledger.".format(graph_hash))
-            return {}
+            return {
+                f.IDENTIFIER.nm: req.identifier,
+                f.REQ_ID.nm: req.reqId,
+                LEI_FIELD: None
+            }
 
     def doStaticValidation(self, request: Request):
         identifier, req_id, op = request.identifier, request.reqId, \
@@ -187,6 +192,17 @@ class GraphchainReqHandler(LedgerRequestHandler):
 
     def _req_to_txn(self, req):
         return reqToTxn(req)
+
+    def handle_post_txn_added_to_ledger_clbk(self, txn):
+        logger.debug("Handling callback: post_txn_added_to_ledger_clbk. Txn details: {}".format(txn))
+        data_element = txn.get(TXN_FIELD).get(DATA_FIELD)
+        graph_format = data_element.get(LEI_FIELD).get(GRAPH_FORMAT_FIELD)
+        decoded_content = data_element.get(LEI_FIELD).get(GRAPH_CONTENT_FIELD)
+        raw_graph = from_base64(decoded_content)
+        graph_hash = txn.get(GRAPH_IHASH_FIELD)
+        logger.debug("Adding graph to graph store. raw_graph='{}', graph_format='{}', graph_hash='{}'"
+                     .format(raw_graph, graph_format, graph_hash))
+        self._graph_store.add_graph(raw_graph, graph_format, graph_hash)
 
     @staticmethod
     def _transform_txn_for_ledger(txn, graph_hash):
