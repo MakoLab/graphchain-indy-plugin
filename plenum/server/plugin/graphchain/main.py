@@ -25,7 +25,7 @@ def integrate_plugin_in_node(node):
 
     _print_node_debug_info(node)
 
-node.config = update_nodes_config_with_plugin_settings(node.config)
+    node.config = update_nodes_config_with_plugin_settings(node.config)
 
     hash_store = get_graphchain_hash_store(node.dataLocation)
     ledger = _prepare_ledger(node, hash_store)
