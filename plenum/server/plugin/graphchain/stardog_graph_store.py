@@ -10,7 +10,10 @@ logger = get_debug_logger()
 
 class StardogGraphStore(GraphStore):
     def __init__(self, ts_db_name, ts_url, ts_user, ts_pass):
-        super(StardogGraphStore, self).__init__(ts_db_name, ts_url, ts_user, ts_pass)
+        super(StardogGraphStore, self).__init__(ts_db_name, ts_url)
+
+        self._ts_user = ts_user
+        self._ts_pass = ts_pass
 
         msg = "Created a new StardogGraphStore with with user equal to '{}' and URL equal to '{}'." \
             .format(ts_user, self._node_ts_url)
@@ -27,7 +30,7 @@ class StardogGraphStore(GraphStore):
         return status_code == 200
 
     def add_graph(self, raw_graph, graph_format, graph_hash):
-        logger.debug("Adding graph to the triple store...")
+        logger.debug("Adding graph to the triple store with URL '{}'...".format(self._get_sparql_endpoint_for_update()))
 
         ihash = GraphStore.IHASH_PREFIX.format(graph_hash)
 

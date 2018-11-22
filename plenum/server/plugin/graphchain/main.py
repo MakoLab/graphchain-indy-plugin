@@ -11,6 +11,7 @@ from plenum.server.plugin.graphchain.graph_req_handler import \
     GraphchainReqHandler
 from plenum.server.plugin.graphchain.graph_store import GraphStoreType
 from plenum.server.plugin.graphchain.logger import get_debug_logger
+from plenum.server.plugin.graphchain.neptune_graph_store import NeptuneGraphStore
 from plenum.server.plugin.graphchain.stardog_graph_store import StardogGraphStore
 from plenum.server.plugin.graphchain.storage import get_graphchain_hash_store, \
     get_graphchain_ledger, get_graphchain_state
@@ -24,7 +25,7 @@ def integrate_plugin_in_node(node):
 
     _print_node_debug_info(node)
 
-    node.config = update_nodes_config_with_plugin_settings(node.config)
+node.config = update_nodes_config_with_plugin_settings(node.config)
 
     hash_store = get_graphchain_hash_store(node.dataLocation)
     ledger = _prepare_ledger(node, hash_store)
@@ -71,7 +72,7 @@ def _prepare_graph_store(node):
     if ts_type == GraphStoreType.STARDOG:
         node.graph_store = StardogGraphStore(ts_db_name, ts_url, ts_user, ts_pass)
     elif ts_type == GraphStoreType.NEPTUNE:
-        raise NotImplementedError("Neptune TS is not implemented yet.")
+        node.graph_store = NeptuneGraphStore(ts_db_name, ts_url)
     else:
         msg = "'{}' triple store type is not supported.".format(ts_type)
         raise TripleStoreTypeNotSupported(msg)

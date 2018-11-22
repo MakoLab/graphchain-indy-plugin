@@ -33,15 +33,13 @@ class GraphStore(ABC):
     }}
     """
 
-    def __init__(self, ts_db_name, ts_url, ts_user, ts_pass):
+    def __init__(self, ts_db_name, ts_url):
         msg = "Creating a new GraphStore with the triple store URL '{}' the database name '{}'." \
             .format(ts_db_name, ts_url)
         logger.info(msg)
 
         self._ts_db_name = ts_db_name
         self._ts_url = ts_url
-        self._ts_user = ts_user
-        self._ts_pass = ts_pass
         self._node_ts_url = ts_url + "/" + ts_db_name
 
     @abstractmethod
