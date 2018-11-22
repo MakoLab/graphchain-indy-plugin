@@ -14,8 +14,7 @@ class FormatValidator:
             if graph_format in self._handled_formats:
                 return True, None
             else:
-                return False, \
-                    "Graph format '{}' not supported.".format(graph_format)
+                return False, "Graph format '{}' not supported.".format(graph_format)
         else:
             return True, None
 

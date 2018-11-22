@@ -98,8 +98,7 @@ class GraphchainReqHandler(LedgerRequestHandler):
             lei = op.get(LEI_FIELD)
 
             if not isinstance(lei, dict):
-                msg = "{} attribute is missing or not in proper format: '{}'" \
-                    .format(LEI_FIELD, lei)
+                msg = "{} attribute is missing or not in proper format: '{}'".format(LEI_FIELD, lei)
                 raise InvalidClientRequest(identifier, req_id, msg)
 
             self._validate_add_lei_request(identifier, req_id, lei)
@@ -168,17 +167,21 @@ class GraphchainReqHandler(LedgerRequestHandler):
             raise InvalidClientRequest(identifier, req_id, msg)
 
         graph_format = lei.get(GRAPH_FORMAT_FIELD)
-        supported, reason = self._format_validator \
-            .validate_format(graph_format, False)
+        supported, reason = self._format_validator.validate_format(graph_format, False)
         if not supported:
             raise InvalidClientRequest(identifier, req_id, reason)
 
         graph = from_base64(graph_base64)
-        graph_valid, reason = self._graph_validator \
-            .validate_graph(graph, graph_format)
+        graph_valid, reason = self._graph_validator.validate_graph(graph, graph_format)
         if not graph_valid:
             msg = "Content of graph is invalid. Details: {}".format(reason)
             raise InvalidClientRequest(identifier, req_id, msg)
+
+        ihash = self._calculate_hash(lei)
+        if self._check_whether_hash_is_already_stored(ihash):
+            msg = "Graph with hash '{}' already added to the ledger".format(ihash)
+            raise InvalidClientRequest(identifier, req_id, msg)
+
 
     def _calculate_hash(self, lei):
         graph = lei.get(GRAPH_CONTENT_FIELD)
@@ -186,6 +189,12 @@ class GraphchainReqHandler(LedgerRequestHandler):
         g = Graph()
         g.parse(data=from_base64(graph), format=graph_format)
         return self._hash_calculator.calculate_hash(g)
+
+    def _check_whether_hash_is_already_stored(self, graph_hash):
+        found_data = self.ledger.get(**{GRAPH_IHASH_FIELD: graph_hash})
+        result = found_data is not None
+        logger.debug("Hash of graph ({}) already stored? {}".format(graph_hash, result))
+        return result
 
     def _gen_txn_path(self, txn):
         return None
