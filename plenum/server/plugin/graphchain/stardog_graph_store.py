@@ -1,5 +1,5 @@
 import requests
-from SPARQLWrapper import SPARQLWrapper
+from SPARQLWrapper import SPARQLWrapper, JSON
 from rdflib import Graph
 
 from plenum.server.plugin.graphchain.graph_store import GraphStore
@@ -46,3 +46,21 @@ class StardogGraphStore(GraphStore):
         sparql_query.method = 'POST'
         sparql_query.setCredentials(self._ts_user, self._ts_pass)
         sparql_query.query()
+
+    def check_if_graph_is_already_stored(self, graph_hash):
+        ihash = GraphStore.IHASH_PREFIX.format(graph_hash)
+
+        logger.debug("Checking whether graph '{}' is already in the triple store...".format(ihash))
+
+        query = GraphStore.ASK_IF_GRAPH_IS_ALREADY_STORED.format(ihash)
+
+        sparql_query = SPARQLWrapper(
+            self._get_sparql_endpoint_for_query(),
+            self._get_sparql_endpoint_for_update())
+
+        sparql_query.setQuery(query)
+        sparql_query.method = 'POST'
+        sparql_query.setReturnFormat(JSON)
+        sparql_query.setCredentials(self._ts_user, self._ts_pass)
+        result = sparql_query.query()
+        return result.convert()['boolean']

@@ -1,5 +1,5 @@
 from ledger.compact_merkle_tree import CompactMerkleTree
-from plenum.common.constants import HS_LEVELDB
+from plenum.common.constants import HS_ROCKSDB
 from plenum.common.ledger import Ledger
 from plenum.persistence.db_hash_store import DbHashStore
 from state.pruning_state import PruningState
@@ -16,7 +16,7 @@ def get_graphchain_hash_store(data_dir):
 
     return DbHashStore(dataDir=data_dir,
                        fileNamePrefix=GRAPHCHAIN_HASH_STORE_NAME,
-                       db_type=HS_LEVELDB)
+                       db_type=HS_ROCKSDB)
 
 
 def get_graphchain_ledger(data_dir, name, hash_store, config):

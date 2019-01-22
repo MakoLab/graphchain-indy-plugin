@@ -178,10 +178,9 @@ class GraphchainReqHandler(LedgerRequestHandler):
             raise InvalidClientRequest(identifier, req_id, msg)
 
         ihash = self._calculate_hash(lei)
-        if self._check_whether_hash_is_already_stored(ihash):
+        if self._check_whether_hash_is_already_in_ts(ihash):
             msg = "Graph with hash '{}' already added to the ledger".format(ihash)
             raise InvalidClientRequest(identifier, req_id, msg)
-
 
     def _calculate_hash(self, lei):
         graph = lei.get(GRAPH_CONTENT_FIELD)
@@ -190,9 +189,14 @@ class GraphchainReqHandler(LedgerRequestHandler):
         g.parse(data=from_base64(graph), format=graph_format)
         return self._hash_calculator.calculate_hash(g)
 
-    def _check_whether_hash_is_already_stored(self, graph_hash):
+    def _check_whether_hash_is_already_in_ledger(self, graph_hash):
         found_data = self.ledger.get(**{GRAPH_IHASH_FIELD: graph_hash})
         result = found_data is not None
+        logger.debug("Hash of graph ({}) already stored? {}".format(graph_hash, result))
+        return result
+
+    def _check_whether_hash_is_already_in_ts(self, graph_hash):
+        result = self._graph_store.check_if_graph_is_already_stored(graph_hash)
         logger.debug("Hash of graph ({}) already stored? {}".format(graph_hash, result))
         return result
 
@@ -201,6 +205,14 @@ class GraphchainReqHandler(LedgerRequestHandler):
 
     def _req_to_txn(self, req):
         return reqToTxn(req)
+
+    def handle_pre_catchup_start_clbk(self, txn):
+        logger.debug("Handling callback: pre_catchup_start_clbk. Txn details: {}".format(txn))
+        logger.debug("[TODO] Here we should check whether a graph is already in TS...")
+
+    def handle_post_catchup_start_clbk(self, txn):
+        logger.debug("Handling callback: post_catchup_start_clbk. Txn details: {}".format(txn))
+        logger.debug("[TODO] Here we should check whether a graph is already in TS...")
 
     def handle_post_txn_added_to_ledger_clbk(self, txn):
         logger.debug("Handling callback: post_txn_added_to_ledger_clbk. Txn details: {}".format(txn))

@@ -38,10 +38,17 @@ def integrate_plugin_in_node(node):
 
     graphchain_req_handler = _prepare_request_handler(node, ledger, state)
 
+    # def pre_catchup_start_clbk(ledger_id, txn):
+    #     graphchain_req_handler.handle_pre_catchup_start_clbk(txn)
+    #
+    # def post_catchup_start_clbk(ledger_id, txn):
+    #     graphchain_req_handler.handle_post_catchup_start_clbk(txn)
+
     def post_txn_added_to_ledger_clbk(ledger_id, txn):
         graphchain_req_handler.handle_post_txn_added_to_ledger_clbk(txn)
         node.postTxnFromCatchupAddedToLedger(ledger_id, txn)
 
+    # _register_ledger(node, ledger, pre_catchup_start_clbk, post_catchup_start_clbk, post_txn_added_to_ledger_clbk)
     _register_ledger(node, ledger, post_txn_added_to_ledger_clbk)
 
     logger.debug("Registering request handler with ID equal to '{}'...".format(GRAPHCHAIN_LEDGER_ID))
@@ -112,11 +119,14 @@ def _prepare_request_handler(node, ledger, state):
     return GraphchainReqHandler(ledger, state, node.graph_store)
 
 
+# def _register_ledger(node, ledger, pre_catchup_start_clbk, post_catchup_start_clbk, post_txn_added_to_ledger_clbk):
 def _register_ledger(node, ledger, post_txn_added_to_ledger_clbk):
     logger.debug("Registering ledger...")
     if GRAPHCHAIN_LEDGER_ID not in node.ledger_ids:
         node.ledger_ids.append(GRAPHCHAIN_LEDGER_ID)
     node.ledgerManager.addLedger(GRAPHCHAIN_LEDGER_ID,
                                  ledger,
+                                 # preCatchupStartClbk=pre_catchup_start_clbk,
+                                 # postCatchupStartClbk=post_catchup_start_clbk,
                                  postTxnAddedToLedgerClbk=post_txn_added_to_ledger_clbk)
     node.on_new_ledger_added(GRAPHCHAIN_LEDGER_ID)

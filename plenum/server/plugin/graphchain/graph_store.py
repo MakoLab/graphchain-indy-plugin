@@ -33,6 +33,10 @@ class GraphStore(ABC):
     }}
     """
 
+    ASK_IF_GRAPH_IS_ALREADY_STORED = """
+    ASK {{GRAPH <{}> {{?s ?p ?o}}}}
+    """
+
     def __init__(self, ts_db_name, ts_url):
         msg = "Creating a new GraphStore with the triple store URL '{}' the database name '{}'." \
             .format(ts_db_name, ts_url)
@@ -50,6 +54,10 @@ class GraphStore(ABC):
     def add_graph(self, raw_graph, graph_format, graph_hash):
         pass
 
+    @abstractmethod
+    def check_if_graph_is_already_stored(self, graph_name):
+        pass
+
     def _get_endpoint_address(self):
         return self._ts_url
 
@@ -61,3 +69,4 @@ class GraphStore(ABC):
 
     def _get_sparql_endpoint_for_update(self):
         return self._get_ts_db_url() + "/update"
+
