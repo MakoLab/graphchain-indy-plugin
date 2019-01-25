@@ -206,14 +206,6 @@ class GraphchainReqHandler(LedgerRequestHandler):
     def _req_to_txn(self, req):
         return reqToTxn(req)
 
-    def handle_pre_catchup_start_clbk(self, txn):
-        logger.debug("Handling callback: pre_catchup_start_clbk. Txn details: {}".format(txn))
-        logger.debug("[TODO] Here we should check whether a graph is already in TS...")
-
-    def handle_post_catchup_start_clbk(self, txn):
-        logger.debug("Handling callback: post_catchup_start_clbk. Txn details: {}".format(txn))
-        logger.debug("[TODO] Here we should check whether a graph is already in TS...")
-
     def handle_post_txn_added_to_ledger_clbk(self, txn):
         logger.debug("Handling callback: post_txn_added_to_ledger_clbk. Txn details: {}".format(txn))
         data_element = txn.get(TXN_FIELD).get(DATA_FIELD)

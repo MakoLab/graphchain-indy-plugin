@@ -18,13 +18,16 @@ class InterwovenHashCalculator:
             graph_hash = self._modulo_hash(graph_hash, triple_hash)
 
             if self._is_bnode(s):
-                linked_hash = \
-                    self._calculate_hash_for_triples_linked_by_subject(graph, s)
-                graph_hash = self._modulo_hash(graph_hash, linked_hash)
+                linked_hash_o = self._calculate_hash_for_triples_linked_by_subject(graph, s)
+                linked_hash_s = self._calculate_hash_for_triples_linked_by_object(graph, s)
+                graph_hash = self._modulo_hash(graph_hash, linked_hash_o)
+                graph_hash = self._modulo_hash(graph_hash, linked_hash_s)
 
             if self._is_bnode(o):
-                linked_hash = self._calculate_hash_for_triples_linked_by_object(graph, s)
-                graph_hash = self._modulo_hash(graph_hash, linked_hash)
+                linked_hash_o = self._calculate_hash_for_triples_linked_by_subject(graph, o)
+                linked_hash_s = self._calculate_hash_for_triples_linked_by_object(graph, o)
+                graph_hash = self._modulo_hash(graph_hash, linked_hash_o)
+                graph_hash = self._modulo_hash(graph_hash, linked_hash_s)
 
         return "{0:064x}".format(graph_hash)
 
