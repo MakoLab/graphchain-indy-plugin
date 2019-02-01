@@ -47,7 +47,7 @@ class StardogGraphStore(GraphStore):
         sparql_query.setCredentials(self._ts_user, self._ts_pass)
         sparql_query.query()
 
-    def check_if_graph_is_already_stored(self, graph_hash):
+    def check_if_graph_is_already_stored(self, graph_hash: str) -> bool:
         ihash = GraphStore.IHASH_PREFIX.format(graph_hash)
 
         logger.debug("Checking whether graph '{}' is already in the triple store...".format(ihash))

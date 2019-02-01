@@ -12,6 +12,8 @@ GRAPH_FORMAT_FIELD = "format"
 GRAPH_IHASH_FIELD = "ihash"
 LEI_FIELD = "lei"
 DATA_FIELD = "data"
+SYNC_PAIR_GRAPH_CONTENT = "content"
+SYNC_PAIR_GRAPH_FORMAT = "format"
 TXN_FIELD = "txn"
 TXN_METADATA_FIELD = "txnMetadata"
 

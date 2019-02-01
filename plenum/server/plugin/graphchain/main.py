@@ -1,3 +1,5 @@
+import SPARQLWrapper
+import rdflib
 from plenum.common.constants import DOMAIN_LEDGER_ID
 from plenum.common.startable import Mode
 
@@ -11,6 +13,7 @@ from plenum.server.plugin.graphchain.exceptions import \
 from plenum.server.plugin.graphchain.graph_req_handler import \
     GraphchainReqHandler
 from plenum.server.plugin.graphchain.graph_store import GraphStoreType
+from plenum.server.plugin.graphchain.graph_store_synchronizer import GraphStoreSynchronizer
 from plenum.server.plugin.graphchain.logger import get_debug_logger
 from plenum.server.plugin.graphchain.neptune_graph_store import NeptuneGraphStore
 from plenum.server.plugin.graphchain.stardog_graph_store import StardogGraphStore
@@ -37,16 +40,15 @@ def integrate_plugin_in_node(node):
 
     _prepare_authnr(node)
 
-    graphchain_req_handler = _prepare_request_handler(node, ledger, state)
+    graph_store_synchronizer = _prepare_graph_store_synchronizer(node)
 
-    def post_catchup_complete_clbk(**kwargs):
-        logger.debug("[TODO] arguments: {}".format(kwargs))
+    graphchain_req_handler = _prepare_request_handler(node, ledger, state, graph_store_synchronizer)
 
     def post_txn_added_to_ledger_clbk(ledger_id, txn):
         graphchain_req_handler.handle_post_txn_added_to_ledger_clbk(txn)
         node.postTxnFromCatchupAddedToLedger(ledger_id, txn)
 
-    _register_ledger(node, ledger, post_catchup_complete_clbk, post_txn_added_to_ledger_clbk)
+    _register_ledger(node, ledger, post_txn_added_to_ledger_clbk)
 
     logger.debug("Registering request handler with ID equal to '{}'...".format(GRAPHCHAIN_LEDGER_ID))
     node.register_req_handler(graphchain_req_handler, GRAPHCHAIN_LEDGER_ID)
@@ -65,7 +67,8 @@ def _prepare_ledger(node, hash_store):
 
 
 def _prepare_graph_store(node):
-    logger.info("Initializing TS database...")
+    logger.info("Initializing TS database (rdflib version: {}, SPARQLWrapper version: {})..."
+                .format(rdflib.__version__, SPARQLWrapper.__version__))
 
     ts_type = _obtain_ts_type(node.config.ts_type)
     ts_url = node.config.ts_url
@@ -111,17 +114,21 @@ def _prepare_authnr(node):
     node.clientAuthNr.register_authenticator(graphchain_authnr)
 
 
-def _prepare_request_handler(node, ledger, state):
+def _prepare_graph_store_synchronizer(node):
+    logger.debug("Preparing graph store synchronizer...")
+    return GraphStoreSynchronizer(node.dataLocation, node.config.graphStoreSynchronizerFile)
+
+
+def _prepare_request_handler(node, ledger, state, graph_store_synchronizer):
     logger.debug("Preparing request handler...")
-    return GraphchainReqHandler(ledger, state, node.graph_store)
+    return GraphchainReqHandler(ledger, state, node.graph_store, graph_store_synchronizer)
 
 
-def _register_ledger(node, ledger, post_catchup_complete_clbk, post_txn_added_to_ledger_clbk):
+def _register_ledger(node, ledger, post_txn_added_to_ledger_clbk):
     logger.debug("Registering ledger...")
     if GRAPHCHAIN_LEDGER_ID not in node.ledger_ids:
         node.ledger_ids.append(GRAPHCHAIN_LEDGER_ID)
     node.ledgerManager.addLedger(GRAPHCHAIN_LEDGER_ID,
                                  ledger,
-                                 postCatchupCompleteClbk=post_catchup_complete_clbk,
                                  postTxnAddedToLedgerClbk=post_txn_added_to_ledger_clbk)
     node.on_new_ledger_added(GRAPHCHAIN_LEDGER_ID)
