@@ -7,7 +7,7 @@ from stp_core.common.log import getlogger
 logger = getlogger()
 
 
-INTERVAL = 5
+INTERVAL = 60
 PRIORITY = 1
 UTF_8 = "utf-8"
 
