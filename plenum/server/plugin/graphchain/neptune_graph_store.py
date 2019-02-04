@@ -49,9 +49,7 @@ class NeptuneGraphStore(GraphStore):
 
         query = GraphStore.ASK_IF_GRAPH_IS_ALREADY_STORED.format(ihash)
 
-        sparql_query = SPARQLWrapper(
-            self._get_sparql_endpoint_for_query(),
-            self._get_sparql_endpoint_for_update())
+        sparql_query = SPARQLWrapper(self._ts_url, self._ts_url)
 
         sparql_query.setQuery(query)
         sparql_query.method = 'POST'
