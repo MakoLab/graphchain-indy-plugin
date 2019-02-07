@@ -187,6 +187,10 @@ class GraphchainReqHandler(LedgerRequestHandler):
             logger.warn("Exception thrown while updating graph store. "
                         "graph_hash = '{}', graph_raw_content = '{}', graph_format = '{}'\nDetails: {}"
                         .format(graph_hash, graph_raw_content, graph_format, ex))
+        except Exception as ex:
+            logger.warn("Unspecified exception was thrown while updating graph store with sync. "
+                        "graph_hash = '{}', graph_raw_content = '{}', graph_format = '{}'\nDetails: {}"
+                        .format(graph_hash, graph_raw_content, graph_format, ex))
 
     def _update_graph_store(self, graph_hash, graph_raw_content, graph_format):
         self._graph_store.add_graph(graph_raw_content, graph_format, graph_hash)
