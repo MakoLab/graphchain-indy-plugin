@@ -236,9 +236,15 @@ class GraphchainReqHandler(LedgerRequestHandler):
         return result
 
     def _check_whether_hash_is_already_in_ts(self, graph_hash):
-        result = self._graph_store.check_if_graph_is_already_stored(graph_hash)
-        logger.debug("Hash of graph ({}) already stored? {}".format(graph_hash, result))
-        return result
+        try:
+            result = self._graph_store.check_if_graph_is_already_stored(graph_hash)
+            logger.debug("Hash of graph ({}) already stored in TS? {}".format(graph_hash, result))
+            return result
+        except Exception as ex:
+            logger.warn("Exception thrown while checking whether hash is already in TS. Details: {}".format(ex))
+            result = self._check_whether_hash_is_already_in_ledger(graph_hash)
+            logger.debug("Hash of graph ({}) already stored ledger? {}".format(graph_hash, result))
+            return result
 
     def _gen_txn_path(self, txn):
         return None
